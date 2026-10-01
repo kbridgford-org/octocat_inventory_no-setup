@@ -3,18 +3,8 @@ import axios from 'axios';
 import { useQuery } from 'react-query';
 import { api } from '../../../api/config';
 import { useTheme } from '../../../context/ThemeContext';
-
-interface Product {
-  productId: number;
-  name: string;
-  description: string;
-  price: number;
-  imgName: string;
-  sku: string;
-  unit: string;
-  supplierId: number;
-  discount?: number;
-}
+import { useCart } from '../../../context/useCart';
+import type { Product } from '../../../types/Product';
 
 const fetchProducts = async (): Promise<Product[]> => {
   const { data } = await axios.get(`${api.baseURL}${api.endpoints.products}`);
@@ -26,8 +16,10 @@ export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [cartMessage, setCartMessage] = useState('');
   const { data: products, isLoading, error } = useQuery('products', fetchProducts);
   const { darkMode } = useTheme();
+  const { addProduct } = useCart();
 
   const filteredProducts = products?.filter(
     (product) =>
@@ -49,11 +41,14 @@ export default function Products() {
     }));
   };
 
-  const handleRequestStock = (productId: number) => {
+  const handleAddToCart = (product: Product) => {
+    const productId = product.productId;
     const quantity = quantities[productId] || 0;
-    if (quantity > 0) {
-      // TODO: Implement stock request functionality
-      alert(`Requested stock for ${quantity} items`);
+
+    const result = addProduct(product, quantity);
+    setCartMessage(result.message);
+
+    if (result.ok) {
       setQuantities((prev) => ({
         ...prev,
         [productId]: 0,
@@ -103,6 +98,9 @@ export default function Products() {
           >
             Products
           </h1>
+          <div className="min-h-6" role="status" aria-live="polite">
+            <p className={darkMode ? 'text-gray-200' : 'text-gray-700'}>{cartMessage}</p>
+          </div>
 
           <div className="relative">
             <input
@@ -236,16 +234,16 @@ export default function Products() {
                         </button>
                       </div>
                       <button
-                        onClick={() => handleRequestStock(product.productId)}
+                        onClick={() => handleAddToCart(product)}
                         className={`px-4 py-2 rounded-lg transition-colors ${quantities[product.productId]
                           ? 'bg-primary hover:bg-accent text-white'
                           : `${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'} cursor-not-allowed`
                           }`}
                         disabled={!quantities[product.productId]}
-                        aria-label={`Request stock for ${quantities[product.productId] || 0} ${product.name}`}
-                        id={`request-stock-${product.productId}`}
+                          aria-label={`Add ${quantities[product.productId] || 0} ${product.name} to cart`}
+                          id={`add-to-cart-${product.productId}`}
                       >
-                        Request Stock
+                          Add to cart
                       </button>
                     </div>
                   </div>
