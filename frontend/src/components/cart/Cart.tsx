@@ -56,7 +56,7 @@ function CartLineItem({ line, darkMode, onMessage }: CartLineItemProps) {
             darkMode ? 'text-gray-200' : 'text-gray-700'
           }`}
         >
-          Quantity
+          Quantity <span className="sr-only">for {product.name}</span>
         </label>
         <input
           id={`cart-quantity-${product.productId}`}

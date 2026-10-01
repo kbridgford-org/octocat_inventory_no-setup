@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isValidCartQuantity, MAX_CART_QUANTITY, type CartLine } from '../cart/cart';
 import type { Product } from '../types/Product';
 import { CartContext, type CartActionResult } from './cartContextDefinition';
@@ -12,43 +12,43 @@ function quantityError(productName: string): CartActionResult {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
+  const linesRef = useRef(lines);
 
-  const addProduct = (product: Product, quantity: number): CartActionResult => {
+  const addProduct = useCallback((product: Product, quantity: number): CartActionResult => {
     if (!isValidCartQuantity(quantity)) {
       return quantityError(product.name);
     }
 
-    const existingLine = lines.find((line) => line.product.productId === product.productId);
+    const currentLines = linesRef.current;
+    const existingLine = currentLines.find(
+      (line) => line.product.productId === product.productId,
+    );
     const nextQuantity = (existingLine?.quantity ?? 0) + quantity;
 
     if (nextQuantity > MAX_CART_QUANTITY) {
       return quantityError(product.name);
     }
 
-    setLines((currentLines) => {
-      const matchingLine = currentLines.find(
-        (line) => line.product.productId === product.productId,
-      );
+    const nextLines = existingLine
+      ? currentLines.map((line) =>
+          line.product.productId === product.productId
+            ? { ...line, quantity: line.quantity + quantity }
+            : line,
+        )
+      : [...currentLines, { product, quantity }];
 
-      if (!matchingLine) {
-        return [...currentLines, { product, quantity }];
-      }
-
-      return currentLines.map((line) =>
-        line.product.productId === product.productId
-          ? { ...line, quantity: line.quantity + quantity }
-          : line,
-      );
-    });
+    linesRef.current = nextLines;
+    setLines(nextLines);
 
     return {
       ok: true,
       message: `Added ${quantity} ${product.name} ${quantity === 1 ? 'item' : 'items'} to the cart.`,
     };
-  };
+  }, []);
 
-  const updateQuantity = (productId: number, quantity: number): CartActionResult => {
-    const line = lines.find((candidate) => candidate.product.productId === productId);
+  const updateQuantity = useCallback((productId: number, quantity: number): CartActionResult => {
+    const currentLines = linesRef.current;
+    const line = currentLines.find((candidate) => candidate.product.productId === productId);
 
     if (!line) {
       return { ok: false, message: 'That product is no longer in the cart.' };
@@ -58,22 +58,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return quantityError(line.product.name);
     }
 
-    setLines((currentLines) =>
-      currentLines.map((currentLine) =>
+    const nextLines = currentLines.map((currentLine) =>
         currentLine.product.productId === productId
           ? { ...currentLine, quantity }
           : currentLine,
-      ),
     );
+    linesRef.current = nextLines;
+    setLines(nextLines);
 
     return { ok: true, message: `Updated ${line.product.name} quantity to ${quantity}.` };
-  };
+  }, []);
 
-  const removeProduct = (productId: number) => {
-    setLines((currentLines) =>
-      currentLines.filter((line) => line.product.productId !== productId),
+  const removeProduct = useCallback((productId: number) => {
+    const nextLines = linesRef.current.filter(
+      (line) => line.product.productId !== productId,
     );
-  };
+    linesRef.current = nextLines;
+    setLines(nextLines);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -83,7 +85,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       updateQuantity,
       removeProduct,
     }),
-    [lines],
+    [addProduct, lines, removeProduct, updateQuantity],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

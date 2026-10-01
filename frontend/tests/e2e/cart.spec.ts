@@ -63,7 +63,9 @@ test.describe('Guest shopping cart', () => {
     await expect(page.getByRole('list', { name: 'Cart items' })).toContainText('Nap Tracker');
     await expect(page.getByLabel('Cart summary')).toContainText('$55.00');
 
-    await page.getByLabel('Quantity', { exact: true }).first().fill('2');
+    await expect(page.getByLabel('Quantity for SmartFeeder One', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Quantity for Nap Tracker', { exact: true })).toBeVisible();
+    await page.getByLabel('Quantity for SmartFeeder One', { exact: true }).fill('2');
     await expect(page.getByLabel('Cart summary')).toContainText('$85.00');
   });
 
