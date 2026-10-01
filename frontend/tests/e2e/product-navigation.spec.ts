@@ -1,5 +1,19 @@
 import { test, expect } from '@playwright/test';
 
+const products = [
+  {
+    productId: 1,
+    supplierId: 1,
+    name: 'SmartFeeder One',
+    description: 'AI-powered feeder that works around nap cycles.',
+    price: 49.99,
+    sku: 'FEED-1',
+    unit: 'each',
+    imgName: 'feeder.png',
+    discount: 0,
+  },
+];
+
 /**
  * Product catalog discovery E2E tests
  * Implements: frontend/tests/features/product-navigation.feature
@@ -12,7 +26,15 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Product catalog discovery', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate away from about:blank so localStorage context is available
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname.startsWith('/api/')) {
+        expect(request.method()).toBe('GET');
+      }
+    });
+    await page.route('**/api/products', async (route) => {
+      expect(route.request().method()).toBe('GET');
+      await route.fulfill({ status: 200, contentType: 'application/json', json: products });
+    });
     await page.goto('/');
   });
 
@@ -67,10 +89,19 @@ test.describe('Product catalog discovery', () => {
     await searchInput.fill('Space Tuna');
 
     // Then I see the empty state message "No products found"
-    const emptyState = page.locator('[role="status"]');
+    const emptyState = page.getByRole('status').filter({ hasText: 'No products found' });
     await expect(emptyState).toContainText('No products found');
 
     // And I am prompted to adjust the search filters
     await expect(emptyState).toContainText(/clearing.*changing.*search filters/i);
+  });
+
+  test('Open and close product details', async ({ page }) => {
+    await page.goto('/products');
+    await page.getByRole('img', { name: 'SmartFeeder One' }).click();
+
+    await expect(page.getByRole('heading', { name: 'SmartFeeder One', level: 2 })).toBeVisible();
+    await page.locator('button').filter({ has: page.locator('path[d*="M6 18"]') }).click();
+    await expect(page.getByRole('heading', { name: 'SmartFeeder One', level: 2 })).toBeHidden();
   });
 });
